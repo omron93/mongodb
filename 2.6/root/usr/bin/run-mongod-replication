@@ -1,0 +1,60 @@
+#!/bin/bash
+
+source ${CONTAINER_SCRIPTS_PATH}/base-functions.sh
+source ${CONTAINER_SCRIPTS_PATH}/replset-functions.sh
+
+# Shutdown mongod on SIGINT/SIGTERM
+function cleanup() {
+  if [ $(mongo_addr) == $(mongo_primary_addr) ]; then
+    echo "=> Giving up the PRIMARY role ..."
+    mongo admin -u admin -p "${MONGODB_ADMIN_PASSWORD}" --quiet --eval "rs.stepDown(120);"
+    mongo_wait_primary "-u admin -p ${MONGODB_ADMIN_PASSWORD}"
+  fi
+
+  # Remove from replset
+  mongo_remove
+
+  echo "=> Shutting down MongoDB server ..."
+  if [ -s $dbpath/mongod.lock ]; then
+    mongod $mongod_common_args --shutdown
+  fi
+  wait_mongo "DOWN"
+
+  # Kill replset-supervisor
+  ps -o pid= -p ${supervisor_pid:-0} && kill -TERM ${supervisor_pid:-0}
+
+  exit 0
+}
+
+export mongod_config_file="/etc/mongod.conf"
+
+# Get options from config file
+export dbpath=$(get_option "dbpath" $mongod_config_file)
+
+# Get used port
+port=$(get_port $mongod_config_file)
+export port=${port:-27017}
+
+trap 'cleanup' SIGINT SIGTERM
+
+# Add default config file
+mongod_common_args+="-f $mongod_config_file "
+
+# Run scripts before mongod start
+source ${CONTAINER_SCRIPTS_PATH}/replset-pre-init.sh
+
+# Run replset-supervisor
+${CONTAINER_SCRIPTS_PATH}/replset-supervisor.sh ${1:-} & supervisor_pid=$!
+
+# Run `unset_env_vars` and `mongod` in a subshell because
+# MONGODB_ADMIN_PASSWORD should still be defined when the trapped call to
+# `cleanup` references it.
+set -m
+(
+  # Run scripts before exec mongod 
+  source ${CONTAINER_SCRIPTS_PATH}/post-init.sh
+
+  exec mongod $mongod_common_args
+) &
+wait
+
