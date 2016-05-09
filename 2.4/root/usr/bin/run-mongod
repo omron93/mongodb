@@ -28,6 +28,7 @@ function usage() {
   echo "  MONGODB_ADMIN_PASSWORD"
   echo "Optional variables:"
   echo "  MONGODB_REPLICA_NAME"
+  echo "  MONGODB_INITIAL_REPLICA_COUNT"
   echo "MongoDB settings:"
   echo "  MONGODB_NOPREALLOC (default: true)"
   echo "  MONGODB_SMALLFILES (default: true)"
@@ -41,7 +42,7 @@ function unset_env_vars() {
 }
 
 function cleanup() {
-  if [ ! -z "${MONGODB_REPLICA_NAME-}" ]; then
+  if [ -n "${MONGODB_REPLICA_NAME-}" ]; then
     mongo_remove
   fi
   echo "=> Shutting down MongoDB server ..."
@@ -78,7 +79,9 @@ if [ -z "${MONGODB_REPLICA_NAME-}" ]; then
     # At this time the MongoDB does not accept the incoming connections.
     mongod $mongo_common_args & #--bind_ip 127.0.0.1 --quiet >/dev/null &
     wait_for_mongo_up
-    mongo_create_users
+    mongo_create_admin
+    mongo_create_user
+    touch ${MONGODB_DATADIR}/.mongodb_datadir_initialized
     # Restart the MongoDB daemon to bind on all interfaces
     mongod $mongo_common_args --shutdown
     wait_for_mongo_down

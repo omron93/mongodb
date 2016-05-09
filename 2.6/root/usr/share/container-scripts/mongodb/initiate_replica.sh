@@ -6,17 +6,27 @@ set -o pipefail
 
 source  ${CONTAINER_SCRIPTS_PATH}/common.sh
 
-echo -n "=> Waiting for MongoDB endpoints ..."
-while true; do
-  if [ ! -z "$(endpoints)" ]; then
-    echo $(endpoints)
-    break
-  fi
-  sleep 2
-done
+current_endpoints=$(endpoints)
+if [ -n "${MONGODB_INITIAL_REPLICA_COUNT:-}" ]; then
+  echo -n "=> Waiting for $MONGODB_INITIAL_REPLICA_COUNT MongoDB endpoints ..."
+  while [[ "$(echo "${current_endpoints}" | wc -l)" -lt ${MONGODB_INITIAL_REPLICA_COUNT} ]]; do
+    sleep 2
+    current_endpoints=$(endpoints)
+  done
+else
+  echo "Attention: MONGODB_INITIAL_REPLICA_COUNT is not set and it could lead to a improperly configured replica set."
+  echo "To fix this, set MONGODB_INITIAL_REPLICA_COUNT variable to the number of members in the replica set in"
+  echo "the configuration of post deployment hook."
+
+  echo -n "=> Waiting for MongoDB endpoints ..."
+  while [ -z "${current_endpoints}" ]; do
+    sleep 2
+    current_endpoints=$(endpoints)
+  done
+fi
+echo "${current_endpoints}"
 
 # Let initialize the first member of the cluster
-current_endpoints=$(endpoints)
 mongo_node="$(echo -n ${current_endpoints} | cut -d ' ' -f 1):${CONTAINER_PORT}"
 
 echo "=> Waiting for all endpoints to accept connections..."
@@ -33,10 +43,11 @@ MONGODB_NO_SUPERVISOR=1 MONGODB_NO_AUTH=1 run-mongod mongod &
 wait_for_mongo_up
 
 # This will perform the 'rs.initiate()' command on the current MongoDB.
-mongo_initiate
+mongo_initiate "${current_endpoints}"
 
 echo "=> Creating MongoDB users ..."
-mongo_create_users
+mongo_create_admin
+mongo_create_user "-u admin -p ${MONGODB_ADMIN_PASSWORD}"
 
 echo "=> Waiting for replication to finish ..."
 # TODO: Replace this with polling or a Mongo script that will check if all
