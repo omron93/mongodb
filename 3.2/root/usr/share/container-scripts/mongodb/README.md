@@ -53,7 +53,7 @@ will be started. If you are re-attaching the volume to another container, the
 creation of the database user and admin user will be skipped and only the
 MongoDB daemon will be started.
 
-Custom configuration file
+Custom configuration options
 ---------------------------------
 
 It is allowed to use custom configuration file for mongod server. Providing a custom configuration file supercedes the individual configuration environment variable values.
@@ -61,6 +61,14 @@ It is allowed to use custom configuration file for mongod server. Providing a cu
 To use custom configuration file in container it has to be mounted into `/etc/mongod.conf`. For example to use configuration file stored in `/home/user` directory use this option for `docker run` command: `-v /home/user/mongod.conf:/etc/mongod.conf:Z`.
 
 **Notice: Custom config file does not affect name of replica set. It has to be set in `MONGODB_REPLICA_NAME` environment variable.**
+
+
+It is also allowed to pass custom arguments to `mongod` server. To do this it is neccessary to explicitly use default image command (`run-mongod`). All arguments after `run-mongod` are passed to `mongod` server. So it can be used in this way:
+```
+$ docker run -d -e MONGODB_USER=<user> -e MONGODB_PASSWORD=<password> -e MONGODB_DATABASE=<database> -e MONGODB_ADMIN_PASSWORD=<admin_password> centos/mongodb-32-centos7 run-mongod --storageEngine=mmapv1
+```
+
+These arguments supercedes the individual configuration environment variable values and mounted configuration file.
 
 MongoDB admin user
 ---------------------------------
