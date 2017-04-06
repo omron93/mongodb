@@ -177,6 +177,14 @@ function setup_default_datadir() {
   fi
 }
 
+# setup_soft_limits sets soft limits to maximum (hard limit)
+function setup_soft_limits() {
+  info "Setting soft limits to maximum"
+  for x in c d e f i l m n q r s t u v x; do
+    ulimit -S${x} $(ulimit -H${x})
+  done
+}
+
 # info prints a message prefixed by date and time.
 function info() {
   printf "=> [%s] %s\n" "$(date +'%a %b %d %T')" "$*"
