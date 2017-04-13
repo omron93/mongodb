@@ -1,4 +1,5 @@
-FROM centos:centos7
+FROM centos/s2i-base-centos7
+MAINTAINER SoftwareCollections.org <sclorg@redhat.com>
 
 ENV SUMMARY="MongoDB NoSQL database server" \
     DESCRIPTION="MongoDB (from humongous) is a free and open-source \
@@ -20,6 +21,7 @@ LABEL summary="$SUMMARY" \
 
 ENV MONGODB_VERSION=3.2 \
     # Set paths to avoid hard-coding them in scripts.
+    APP_DATA=$HOME \
     HOME=/var/lib/mongodb \
     CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts/mongodb \
     # Incantations to enable Software Collections on `bash` and `sh -i`.
@@ -38,6 +40,9 @@ RUN yum install -y centos-release-scl && \
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all
+
+# Copy the S2I scripts from the specific language image to $STI_SCRIPTS_PATH.
+COPY s2i/bin/ $STI_SCRIPTS_PATH
 
 COPY root /
 
